@@ -1,10 +1,10 @@
 const hre = require("hardhat");
 
 async function main() {
-  console.log("Deploying EduChain contract...");
+  console.log("Deploying Mentora contract...");
 
   // Get the contract factory
-  const CourseMarketplace = await hre.ethers.getContractFactory("CourseMarketplace");
+  const CourseMarketplace = await hre.ethers.getContractFactory("Mentora");
   
   // Deploy the contract with initial platform fee of 5%
   const platformFeePercent = 5;
@@ -14,7 +14,7 @@ async function main() {
   await courseMarketplace.waitForDeployment();
 
   const address = await courseMarketplace.getAddress();
-  console.log("EduChain deployed to:", address);
+  console.log("Mentora deployed to:", address);
   console.log("Platform fee set to:", platformFeePercent, "%");
 }
 

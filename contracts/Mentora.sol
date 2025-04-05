@@ -5,7 +5,7 @@ pragma solidity ^0.8.19;
  * @title CourseMarketplace
  * @dev Smart contract for managing and selling educational courses on blockchain with IPFS content storage
  */
-contract CourseMarketplace {
+contract Mentora {
     address public owner;
     uint256 public courseCounter;
     uint256 public platformFeePercent;
@@ -22,6 +22,8 @@ contract CourseMarketplace {
         uint256 id;
         string title;
         string description;
+        string category;
+        uint256 difficulty;
         string thumbnailIpfsHash;
         address creator;
         uint256 price;
@@ -104,8 +106,10 @@ contract CourseMarketplace {
     function createCourse(
         string memory _title,
         string memory _description,
+        string memory _category,
         string memory _thumbnailIpfsHash,
         string memory _introVideoIpfsHash,
+        uint256 _difficulty,
         uint256 _duration,
         uint256 _price
     ) external {
@@ -121,7 +125,9 @@ contract CourseMarketplace {
         newCourse.id = courseCounter;
         newCourse.title = _title;
         newCourse.description = _description;
+        newCourse.category = _category;
         newCourse.thumbnailIpfsHash = _thumbnailIpfsHash;
+        newCourse.difficulty = _difficulty; // Default difficulty
         newCourse.creator = msg.sender;
         newCourse.price = _price;
         newCourse.isActive = true;
@@ -430,7 +436,9 @@ contract CourseMarketplace {
             uint256 id,
             string memory title,
             string memory description,
+            string memory category,
             string memory thumbnailIpfsHash,
+            uint256 difficulty,
             address creator,
             uint256 price,
             bool isActive,
@@ -445,7 +453,9 @@ contract CourseMarketplace {
             course.id,
             course.title,
             course.description,
+            course.category,
             course.thumbnailIpfsHash,
+            course.difficulty,
             course.creator,
             course.price,
             course.isActive,
