@@ -106,6 +106,7 @@ contract CourseMarketplace {
         string memory _description,
         string memory _thumbnailIpfsHash,
         string memory _introVideoIpfsHash,
+        uint256 _duration,
         uint256 _price
     ) external {
         require(bytes(_title).length > 0, "Title cannot be empty");
@@ -128,7 +129,7 @@ contract CourseMarketplace {
         newCourse.totalRevenue = 0;
         newCourse.moduleCount = 0;
         newCourse.enrolledUsers = 0;
-        newCourse.duration = 0;
+        newCourse.duration = _duration;
         
         // Initialize course content
         CourseContent storage newContent = courseContents[courseCounter];
