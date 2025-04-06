@@ -11,10 +11,7 @@ contract Mentora {
     uint256 public platformFeePercent;
     
     struct CourseContent {
-        string introVideoIpfsHash;
-        string[] moduleIpfsHashes;
-        string[] moduleTitles;
-        mapping(uint256 => string) materialIpfsHashes; // Additional materials per module
+        string contentIpfsHash; // JSON containing intro video, modules, materials
         uint256 materialCount;
     }
     
@@ -100,7 +97,7 @@ contract Mentora {
      * @param _title Course title
      * @param _description Course description
      * @param _thumbnailIpfsHash IPFS hash of the course thumbnail
-     * @param _introVideoIpfsHash IPFS hash of the intro/preview video
+     * @param _contentIpfsHash IPFS hash of the course content JSON
      * @param _price Course price in wei
      */
     function createCourse(
@@ -108,14 +105,15 @@ contract Mentora {
         string memory _description,
         string memory _category,
         string memory _thumbnailIpfsHash,
-        string memory _introVideoIpfsHash,
+        string memory _contentIpfsHash,
         uint256 _difficulty,
         uint256 _duration,
-        uint256 _price
+        uint256 _price,
+        uint256 _moduleCount
     ) external {
         require(bytes(_title).length > 0, "Title cannot be empty");
         require(bytes(_thumbnailIpfsHash).length > 0, "Thumbnail IPFS hash cannot be empty");
-        require(bytes(_introVideoIpfsHash).length > 0, "Intro video IPFS hash cannot be empty");
+        require(bytes(_contentIpfsHash).length > 0, "Content IPFS hash cannot be empty");
         require(_price > 0, "Price must be greater than zero");
         
         courseCounter++;
@@ -127,19 +125,19 @@ contract Mentora {
         newCourse.description = _description;
         newCourse.category = _category;
         newCourse.thumbnailIpfsHash = _thumbnailIpfsHash;
-        newCourse.difficulty = _difficulty; // Default difficulty
+        newCourse.difficulty = _difficulty;
         newCourse.creator = msg.sender;
         newCourse.price = _price;
         newCourse.isActive = true;
         newCourse.totalSales = 0;
         newCourse.totalRevenue = 0;
-        newCourse.moduleCount = 0;
+        newCourse.moduleCount = _moduleCount;
         newCourse.enrolledUsers = 0;
         newCourse.duration = _duration;
         
         // Initialize course content
         CourseContent storage newContent = courseContents[courseCounter];
-        newContent.introVideoIpfsHash = _introVideoIpfsHash;
+        newContent.contentIpfsHash = _contentIpfsHash;
         newContent.materialCount = 0;
         
         creatorCourseIds[msg.sender].push(courseCounter);
@@ -148,60 +146,49 @@ contract Mentora {
     }
     
     /**
-     * @dev Add a module to an existing course
+     * @dev Update course content
      * @param _courseId ID of the course
-     * @param _moduleTitle Title of the module
-     * @param _moduleIpfsHash IPFS hash of the module video
+     * @param _contentIpfsHash New IPFS hash for the content JSON
+     * @param _moduleCount Updated module count
      */
-    function addModule(
+    function updateCourseContent(
         uint256 _courseId,
-        string memory _moduleTitle,
-        string memory _moduleIpfsHash
+        string memory _contentIpfsHash,
+        uint256 _moduleCount
     ) 
         external 
         courseExists(_courseId)
         onlyCourseCreator(_courseId)
     {
-        require(bytes(_moduleTitle).length > 0, "Module title cannot be empty");
-        require(bytes(_moduleIpfsHash).length > 0, "Module IPFS hash cannot be empty");
+        require(bytes(_contentIpfsHash).length > 0, "Content IPFS hash cannot be empty");
         
         Course storage course = courses[_courseId];
         CourseContent storage content = courseContents[_courseId];
         
-        // Add module
-        content.moduleIpfsHashes.push(_moduleIpfsHash);
-        content.moduleTitles.push(_moduleTitle);
+        // Update content hash
+        content.contentIpfsHash = _contentIpfsHash;
         
         // Update course module count
-        course.moduleCount++;
+        course.moduleCount = _moduleCount;
         
-        emit ModuleAdded(_courseId, course.moduleCount - 1, _moduleTitle);
-        emit CourseContentUpdated(_courseId, course.moduleCount);
+        emit CourseContentUpdated(_courseId, _moduleCount);
     }
     
     /**
-     * @dev Add additional material to a module
+     * @dev Update material count
      * @param _courseId ID of the course
-     * @param _moduleIndex Index of the module
-     * @param _materialIpfsHash IPFS hash of the material
+     * @param _materialCount New material count
      */
-    function addMaterial(
+    function updateMaterialCount(
         uint256 _courseId,
-        uint256 _moduleIndex,
-        string memory _materialIpfsHash
+        uint256 _materialCount
     )
         external
         courseExists(_courseId)
         onlyCourseCreator(_courseId)
     {
-        require(_moduleIndex < courses[_courseId].moduleCount, "Module index out of bounds");
-        require(bytes(_materialIpfsHash).length > 0, "Material IPFS hash cannot be empty");
-        
         CourseContent storage content = courseContents[_courseId];
-        content.materialIpfsHashes[content.materialCount] = _materialIpfsHash;
-        content.materialCount++;
-        
-        emit MaterialAdded(_courseId, _moduleIndex, content.materialCount - 1);
+        content.materialCount = _materialCount;
     }
     
     /**
@@ -210,7 +197,7 @@ contract Mentora {
      * @param _title New course title
      * @param _description New course description
      * @param _thumbnailIpfsHash New thumbnail IPFS hash
-     * @param _introVideoIpfsHash New intro video IPFS hash
+     * @param _contentIpfsHash New content IPFS hash
      * @param _price New course price in wei
      * @param _isActive Course active status
      */
@@ -219,9 +206,10 @@ contract Mentora {
         string memory _title, 
         string memory _description,
         string memory _thumbnailIpfsHash,
-        string memory _introVideoIpfsHash,
+        string memory _contentIpfsHash,
         uint256 _price, 
-        bool _isActive
+        bool _isActive,
+        uint256 _moduleCount
     ) 
         external 
         courseExists(_courseId) 
@@ -229,7 +217,7 @@ contract Mentora {
     {
         require(bytes(_title).length > 0, "Title cannot be empty");
         require(bytes(_thumbnailIpfsHash).length > 0, "Thumbnail IPFS hash cannot be empty");
-        require(bytes(_introVideoIpfsHash).length > 0, "Intro video IPFS hash cannot be empty");
+        require(bytes(_contentIpfsHash).length > 0, "Content IPFS hash cannot be empty");
         require(_price > 0, "Price must be greater than zero");
         
         Course storage course = courses[_courseId];
@@ -238,39 +226,12 @@ contract Mentora {
         course.thumbnailIpfsHash = _thumbnailIpfsHash;
         course.price = _price;
         course.isActive = _isActive;
+        course.moduleCount = _moduleCount;
         
         CourseContent storage content = courseContents[_courseId];
-        content.introVideoIpfsHash = _introVideoIpfsHash;
+        content.contentIpfsHash = _contentIpfsHash;
         
         emit CourseUpdated(_courseId, _title, _price, _isActive);
-    }
-    
-    /**
-     * @dev Update a module's content
-     * @param _courseId ID of the course
-     * @param _moduleIndex Index of the module to update
-     * @param _moduleTitle New module title
-     * @param _moduleIpfsHash New module IPFS hash
-     */
-    function updateModule(
-        uint256 _courseId,
-        uint256 _moduleIndex,
-        string memory _moduleTitle,
-        string memory _moduleIpfsHash
-    )
-        external
-        courseExists(_courseId)
-        onlyCourseCreator(_courseId)
-    {
-        require(_moduleIndex < courses[_courseId].moduleCount, "Module index out of bounds");
-        require(bytes(_moduleTitle).length > 0, "Module title cannot be empty");
-        require(bytes(_moduleIpfsHash).length > 0, "Module IPFS hash cannot be empty");
-        
-        CourseContent storage content = courseContents[_courseId];
-        content.moduleTitles[_moduleIndex] = _moduleTitle;
-        content.moduleIpfsHashes[_moduleIndex] = _moduleIpfsHash;
-        
-        emit ModuleAdded(_courseId, _moduleIndex, _moduleTitle);
     }
     
     /**
@@ -428,10 +389,10 @@ contract Mentora {
      * @dev Get course information (public fields)
      * @param _courseId ID of the course
      */
-    function getCourseInfo(uint256 _courseId) 
-        external 
-        view 
-        courseExists(_courseId) 
+    function getCourseInfo(uint256 _courseId)
+        external
+        view
+        courseExists(_courseId)
         returns (
             uint256 id,
             string memory title,
@@ -439,93 +400,72 @@ contract Mentora {
             string memory category,
             string memory thumbnailIpfsHash,
             uint256 difficulty,
-            address creator,
-            uint256 price,
-            bool isActive,
-            uint256 totalSales,
-            uint256 moduleCount,
-            uint256 enrolledUsers,
             uint256 duration
-        ) 
+        )
     {
         Course storage course = courses[_courseId];
         return (
             course.id,
-            course.title,
+            course.title, 
             course.description,
             course.category,
             course.thumbnailIpfsHash,
             course.difficulty,
+            course.duration
+        );
+    }
+
+    function getCourseStats(uint256 _courseId)
+        external
+        view 
+        courseExists(_courseId)
+        returns (
+            address creator,
+            bool isActive,
+            uint256 price,
+            uint256 totalSales,
+            uint256 moduleCount,
+            uint256 enrolledUsers
+        )
+    {
+        Course storage course = courses[_courseId];
+        return (
             course.creator,
-            course.price,
             course.isActive,
+            course.price,
             course.totalSales,
             course.moduleCount,
-            course.enrolledUsers,
-            course.duration
+            course.enrolledUsers
         );
     }
     
     /**
-     * @dev Get intro video IPFS hash (available for all users)
+     * @dev Get course content IPFS hash
      * @param _courseId ID of the course
-     * @return IPFS hash of the intro video
+     * @return IPFS hash of the course content JSON
      */
-    function getCourseIntroVideo(uint256 _courseId) 
-        external 
-        view 
-        courseExists(_courseId) 
-        returns (string memory) 
-    {
-        return courseContents[_courseId].introVideoIpfsHash;
-    }
-    
-    /**
-     * @dev Get module titles (available for all users)
-     * @param _courseId ID of the course
-     * @return Array of module titles
-     */
-    function getModuleTitles(uint256 _courseId) 
-        external 
-        view 
-        courseExists(_courseId) 
-        returns (string[] memory) 
-    {
-        return courseContents[_courseId].moduleTitles;
-    }
-    
-    /**
-     * @dev Get module video IPFS hash (available only for course owners)
-     * @param _courseId ID of the course
-     * @param _moduleIndex Index of the module
-     * @return IPFS hash of the module video
-     */
-    function getModuleVideo(uint256 _courseId, uint256 _moduleIndex) 
+    function getCourseContent(uint256 _courseId) 
         external 
         view 
         courseExists(_courseId)
         hasPurchasedCourse(_courseId)
         returns (string memory) 
     {
-        require(_moduleIndex < courses[_courseId].moduleCount, "Module index out of bounds");
-        return courseContents[_courseId].moduleIpfsHashes[_moduleIndex];
+        return courseContents[_courseId].contentIpfsHash;
     }
     
     /**
-     * @dev Get material IPFS hash (available only for course owners)
+     * @dev Get course preview content IPFS hash (available for all users)
      * @param _courseId ID of the course
-     * @param _materialIndex Index of the material
-     * @return IPFS hash of the material
+     * @return IPFS hash of the course content JSON
      */
-    function getMaterial(uint256 _courseId, uint256 _materialIndex) 
+    function getCoursePreview(uint256 _courseId) 
         external 
         view 
-        courseExists(_courseId)
-        hasPurchasedCourse(_courseId)
+        courseExists(_courseId) 
         returns (string memory) 
     {
-        require(_materialIndex < courseContents[_courseId].materialCount, "Material index out of bounds");
-        return courseContents[_courseId].materialIpfsHashes[_materialIndex];
+        return courseContents[_courseId].contentIpfsHash;
     }
     
     /**

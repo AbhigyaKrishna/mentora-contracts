@@ -6,9 +6,16 @@ module.exports = {
   solidity: {
     version: "0.8.19",
     settings: {
+      viaIR: true,
       optimizer: {
         enabled: true,
-        runs: 200
+        runs: 200,
+        details: {
+          yul: true,
+          deduplicate: true,
+          cse: true,
+          constantOptimizer: true
+        }
       }
     }
   },
