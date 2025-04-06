@@ -4,16 +4,9 @@ const { execSync } = require('child_process');
 
 async function main() {
   try {
-    // Compile the contracts
+    // Compile all contracts
     console.log('Compiling contracts...');
     execSync('npx hardhat compile', { stdio: 'inherit' });
-
-    // Read the compiled contract artifact
-    const artifactPath = path.join(__dirname, '..', 'artifacts', 'contracts', 'Mentora.sol', 'Mentora.json');
-    const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
-
-    // Extract the ABI
-    const abi = artifact.abi;
 
     // Create abis directory if it doesn't exist
     const abisDir = path.join(__dirname, '..', 'abis');
@@ -21,13 +14,32 @@ async function main() {
       fs.mkdirSync(abisDir);
     }
 
-    // Write the ABI to a file
-    const abiPath = path.join(abisDir, 'Mentora.json');
-    fs.writeFileSync(abiPath, JSON.stringify(abi, null, 2));
+    // Get all contract files from the contracts directory
+    const contractsDir = path.join(__dirname, '..', 'contracts');
+    const contractFiles = fs.readdirSync(contractsDir)
+      .filter(file => file.endsWith('.sol'));
 
-    console.log(`ABI generated successfully at ${abiPath}`);
+    // Process each contract
+    for (const contractFile of contractFiles) {
+      const contractName = contractFile.replace('.sol', '');
+      const artifactPath = path.join(__dirname, '..', 'artifacts', 'contracts', contractFile, `${contractName}.json`);
+      
+      if (fs.existsSync(artifactPath)) {
+        const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+        const abi = artifact.abi;
+
+        // Write the ABI to a file
+        const abiPath = path.join(abisDir, `${contractName}.json`);
+        fs.writeFileSync(abiPath, JSON.stringify(abi, null, 2));
+        console.log(`Generated ABI for ${contractName} at ${abiPath}`);
+      } else {
+        console.warn(`No artifact found for ${contractName}`);
+      }
+    }
+
+    console.log('ABI generation completed successfully');
   } catch (error) {
-    console.error('Error generating ABI:', error);
+    console.error('Error generating ABIs:', error);
     process.exit(1);
   }
 }
