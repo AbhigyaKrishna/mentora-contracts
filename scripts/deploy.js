@@ -1,71 +1,39 @@
 const hre = require("hardhat");
-const path = require("path");
-const fs = require("fs");
 
 async function main() {
-  try {
-    console.log("Starting deployment process...");
+  console.log("Deploying Mentora contract...");
 
-    // Get all contract files from the contracts directory
-    const contractsDir = path.join(__dirname, "..", "contracts");
-    const contractFiles = fs.readdirSync(contractsDir)
-      .filter(file => file.endsWith('.sol'));
+  // Get the contract factory
+  const Mentora = await hre.ethers.getContractFactory("Mentora");
+  
+  // Deploy the contract with initial platform fee of 5%
+  const platformFeePercent = process.env.PLATFORM_FEE_PERCENT || 5;
+  const mentora = await Mentora.deploy(platformFeePercent);
 
-    // Process each contract
-    for (const contractFile of contractFiles) {
-      const contractName = contractFile.replace('.sol', '');
-      console.log(`\nDeploying ${contractName}...`);
+  // Wait for deployment to finish
+  await mentora.waitForDeployment();
 
-      try {
-        // Get the contract factory
-        const Contract = await hre.ethers.getContractFactory(contractName);
-        
-        // Deploy the contract
-        const contract = await Contract.deploy();
-        await contract.deployed();
+  const mentoraAddress = await mentora.getAddress();
+  console.log("Mentora deployed to:", mentoraAddress);
+  console.log("Platform fee set to:", platformFeePercent, "%");
 
-        console.log(`${contractName} deployed to:`, contract.address);
-
-        // Wait for a few blocks to ensure the deployment is confirmed
-        console.log("Waiting for confirmations...");
-        await contract.deployTransaction.wait(5);
-
-        // Save deployment info
-        const deploymentsDir = path.join(__dirname, "..", "deployments");
-        if (!fs.existsSync(deploymentsDir)) {
-          fs.mkdirSync(deploymentsDir);
-        }
-
-        const deploymentInfo = {
-          contractName: contractName,
-          address: contract.address,
-          network: hre.network.name,
-          deployer: contract.deployTransaction.from,
-          blockNumber: contract.deployTransaction.blockNumber,
-          timestamp: new Date().toISOString()
-        };
-
-        const deploymentPath = path.join(deploymentsDir, `${contractName}-${hre.network.name}.json`);
-        fs.writeFileSync(deploymentPath, JSON.stringify(deploymentInfo, null, 2));
-        console.log(`Deployment info saved to: ${deploymentPath}`);
-
-      } catch (error) {
-        console.error(`Error deploying ${contractName}:`, error);
-        // Continue with next contract even if one fails
-        continue;
-      }
-    }
-
-    console.log("\nDeployment process completed!");
-  } catch (error) {
-    console.error("Error in deployment process:", error);
-    process.exit(1);
-  }
+  console.log("Deploying AssignmentManager contract...");
+  
+  // Get the AssignmentManager contract factory
+  const AssignmentManager = await hre.ethers.getContractFactory("AssignmentManager");
+  
+  // Deploy the AssignmentManager contract
+  const assignmentManager = await AssignmentManager.deploy();
+  
+  // Wait for deployment to finish
+  await assignmentManager.waitForDeployment();
+  
+  const assignmentManagerAddress = await assignmentManager.getAddress();
+  console.log("AssignmentManager deployed to:", assignmentManagerAddress);
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  }); 
+// Handle errors
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+}); 
