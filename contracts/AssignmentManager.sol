@@ -17,7 +17,7 @@ contract AssignmentManager {
     mapping(uint256 => Assignment) public assignments;
     
     // Counter for assignment IDs
-    uint256 private assignmentCounter;
+    uint256 public assignmentCounter;
 
     // Events
     event AssignmentCreated(uint256 indexed assignmentId, address indexed creator);
