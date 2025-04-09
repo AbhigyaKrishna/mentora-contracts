@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 contract AssignmentManager {
     struct Assignment {
@@ -7,7 +7,8 @@ contract AssignmentManager {
         string description;
         string question;
         string evaluationCriteria;
-        string metaPrompt;
+        string metaPromptIpfsHash; // IPFS hash for the meta prompt JSON
+        string[] checkpoints; // Array of checkpoint strings
         uint256 createdAt;
         address creator;
         bool isActive;
@@ -41,7 +42,8 @@ contract AssignmentManager {
         string memory _description,
         string memory _question,
         string memory _evaluationCriteria,
-        string memory _metaPrompt
+        string memory _metaPromptIpfsHash,
+        string[] memory _checkpoints
     ) public returns (uint256) {
         uint256 assignmentId = assignmentCounter++;
         
@@ -50,7 +52,8 @@ contract AssignmentManager {
             description: _description,
             question: _question,
             evaluationCriteria: _evaluationCriteria,
-            metaPrompt: _metaPrompt,
+            metaPromptIpfsHash: _metaPromptIpfsHash,
+            checkpoints: _checkpoints,
             createdAt: block.timestamp,
             creator: msg.sender,
             isActive: true
@@ -66,7 +69,8 @@ contract AssignmentManager {
         string memory _description,
         string memory _question,
         string memory _evaluationCriteria,
-        string memory _metaPrompt
+        string memory _metaPromptIpfsHash,
+        string[] memory _checkpoints
     ) public assignmentExists(_assignmentId) onlyCreator(_assignmentId) {
         Assignment storage assignment = assignments[_assignmentId];
         require(assignment.isActive, "Assignment is not active");
@@ -75,7 +79,8 @@ contract AssignmentManager {
         assignment.description = _description;
         assignment.question = _question;
         assignment.evaluationCriteria = _evaluationCriteria;
-        assignment.metaPrompt = _metaPrompt;
+        assignment.metaPromptIpfsHash = _metaPromptIpfsHash;
+        assignment.checkpoints = _checkpoints;
 
         emit AssignmentUpdated(_assignmentId);
     }
@@ -98,19 +103,19 @@ contract AssignmentManager {
             string memory description,
             string memory question,
             string memory evaluationCriteria,
-            string memory metaPrompt,
+            string memory metaPromptIpfsHash,
             uint256 createdAt,
             address creator,
             bool isActive
         ) 
     {
-        Assignment memory assignment = assignments[_assignmentId];
+        Assignment storage assignment = assignments[_assignmentId];
         return (
             assignment.title,
             assignment.description,
             assignment.question,
             assignment.evaluationCriteria,
-            assignment.metaPrompt,
+            assignment.metaPromptIpfsHash,
             assignment.createdAt,
             assignment.creator,
             assignment.isActive
@@ -135,12 +140,21 @@ contract AssignmentManager {
         return assignments[_assignmentId].evaluationCriteria;
     }
 
-    function getAssignmentMetaPrompt(uint256 _assignmentId) 
+    function getAssignmentMetaPromptIpfsHash(uint256 _assignmentId) 
         public 
         view 
         assignmentExists(_assignmentId) 
         returns (string memory) 
     {
-        return assignments[_assignmentId].metaPrompt;
+        return assignments[_assignmentId].metaPromptIpfsHash;
+    }
+    
+    function getAssignmentCheckpoints(uint256 _assignmentId)
+        public
+        view
+        assignmentExists(_assignmentId)
+        returns (string[] memory)
+    {
+        return assignments[_assignmentId].checkpoints;
     }
 } 
