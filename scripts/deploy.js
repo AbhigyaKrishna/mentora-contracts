@@ -50,7 +50,9 @@ async function deployContract(contractName) {
     };
 
     const deploymentPath = path.join(deploymentsDir, `${contractName}-${hre.network.name}.json`);
-    fs.writeFileSync(deploymentPath, JSON.stringify(deploymentInfo, null, 2));
+    const existingDeployments = fs.existsSync(deploymentPath) ? JSON.parse(fs.readFileSync(deploymentPath)) : [];
+    existingDeployments.push(deploymentInfo);
+    fs.writeFileSync(deploymentPath, JSON.stringify(existingDeployments, null, 2));
     console.log(`Deployment info saved to: ${deploymentPath}`);
 
     return address;
