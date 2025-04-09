@@ -1,4 +1,5 @@
 const hre = require("hardhat");
+require("dotenv").config();
 
 async function main() {
   console.log("Deploying Mentora contract...");
