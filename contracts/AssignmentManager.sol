@@ -6,9 +6,8 @@ contract AssignmentManager {
         string title;
         string description;
         string question;
-        string evaluationCriteria;
-        string metaPromptIpfsHash; // IPFS hash for the meta prompt JSON
-        string[] checkpoints; // Array of checkpoint strings
+        string[] evaluationCriteria;
+        string metaPromptIpfsHash;
         uint256 createdAt;
         address creator;
         bool isActive;
@@ -41,9 +40,8 @@ contract AssignmentManager {
         string memory _title,
         string memory _description,
         string memory _question,
-        string memory _evaluationCriteria,
-        string memory _metaPromptIpfsHash,
-        string[] memory _checkpoints
+        string[] memory _evaluationCriteria,
+        string memory _metaPromptIpfsHash
     ) public returns (uint256) {
         uint256 assignmentId = assignmentCounter++;
         
@@ -53,7 +51,6 @@ contract AssignmentManager {
             question: _question,
             evaluationCriteria: _evaluationCriteria,
             metaPromptIpfsHash: _metaPromptIpfsHash,
-            checkpoints: _checkpoints,
             createdAt: block.timestamp,
             creator: msg.sender,
             isActive: true
@@ -68,9 +65,8 @@ contract AssignmentManager {
         string memory _title,
         string memory _description,
         string memory _question,
-        string memory _evaluationCriteria,
-        string memory _metaPromptIpfsHash,
-        string[] memory _checkpoints
+        string[] memory _evaluationCriteria,
+        string memory _metaPromptIpfsHash
     ) public assignmentExists(_assignmentId) onlyCreator(_assignmentId) {
         Assignment storage assignment = assignments[_assignmentId];
         require(assignment.isActive, "Assignment is not active");
@@ -80,7 +76,6 @@ contract AssignmentManager {
         assignment.question = _question;
         assignment.evaluationCriteria = _evaluationCriteria;
         assignment.metaPromptIpfsHash = _metaPromptIpfsHash;
-        assignment.checkpoints = _checkpoints;
 
         emit AssignmentUpdated(_assignmentId);
     }
@@ -102,7 +97,7 @@ contract AssignmentManager {
             string memory title,
             string memory description,
             string memory question,
-            string memory evaluationCriteria,
+            string[] memory evaluationCriteria,
             string memory metaPromptIpfsHash,
             uint256 createdAt,
             address creator,
@@ -135,7 +130,7 @@ contract AssignmentManager {
         public 
         view 
         assignmentExists(_assignmentId) 
-        returns (string memory) 
+        returns (string[] memory) 
     {
         return assignments[_assignmentId].evaluationCriteria;
     }
@@ -147,14 +142,5 @@ contract AssignmentManager {
         returns (string memory) 
     {
         return assignments[_assignmentId].metaPromptIpfsHash;
-    }
-    
-    function getAssignmentCheckpoints(uint256 _assignmentId)
-        public
-        view
-        assignmentExists(_assignmentId)
-        returns (string[] memory)
-    {
-        return assignments[_assignmentId].checkpoints;
     }
 } 
