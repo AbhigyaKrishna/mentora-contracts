@@ -10,6 +10,7 @@ artifacts/
 typechain/
 typechain-types/
 abis/
+deployments/
 
 # IDE files
 .vscode/
