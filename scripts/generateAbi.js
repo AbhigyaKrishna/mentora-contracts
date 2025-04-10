@@ -14,15 +14,20 @@ async function main() {
       fs.mkdirSync(abisDir);
     }
 
-    // Get all contract files from the contracts directory
-    const contractsDir = path.join(__dirname, '..', 'contracts');
-    const contractFiles = fs.readdirSync(contractsDir)
-      .filter(file => file.endsWith('.sol'));
+    // Define contracts to generate ABIs for
+    const contracts = [
+      'MentoraToken',
+      'CourseManager',
+      'AssignmentManager'
+    ];
 
     // Process each contract
-    for (const contractFile of contractFiles) {
-      const contractName = contractFile.replace('.sol', '');
-      const artifactPath = path.join(__dirname, '..', 'artifacts', 'contracts', contractFile, `${contractName}.json`);
+    for (const contractName of contracts) {
+      const contractFileName = `${contractName}.sol`;
+      const artifactPath = path.join(
+        __dirname, '..', 'artifacts', 'contracts', 
+        contractFileName, `${contractName}.json`
+      );
       
       if (fs.existsSync(artifactPath)) {
         const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
