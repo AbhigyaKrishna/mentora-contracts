@@ -1,12 +1,21 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
+
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {MentoraToken} from "./MentoraToken.sol";
 
 /**
  * @title CourseMarketplace
  * @dev Smart contract for managing and selling educational courses on blockchain with IPFS content storage
  */
-contract Mentora {
-    address public owner;
+contract CourseManager is Ownable, Pausable, AccessControl, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     uint256 public courseCounter;
     uint256 public platformFeePercent;
     
@@ -37,9 +46,18 @@ contract Mentora {
         uint256 purchaseDate;
         bool refundRequested;
         bool refunded;
+        bool completed;
+        uint256 completedDate;
     }
+
+    bytes32 public constant INSTRUCTOR_ROLE = keccak256("INSTRUCTOR_ROLE");
+    bytes32 public constant STUDENT_ROLE = keccak256("STUDENT_ROLE");
+
     
-    // Storage
+    // MentoraToken instance
+    MentoraToken public mentoraToken;
+    
+    // Mapping to store courses by their ID
     mapping(uint256 => Course) public courses;
     mapping(uint256 => CourseContent) private courseContents;
     mapping(address => mapping(uint256 => Purchase)) public userPurchases;
@@ -58,13 +76,10 @@ contract Mentora {
     event RefundRequested(uint256 courseId, address buyer);
     event RefundProcessed(uint256 courseId, address buyer, uint256 amount);
     event CreatorWithdrawal(address creator, uint256 amount);
+    event CourseCompleted(uint256 courseId, address student, uint256 completedDate);
+    event TokensRewarded(address student, uint256 courseId, uint256 amount);
     
-    // Modifiers
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this function");
-        _;
-    }
-    
+    // Modifiers    
     modifier onlyCourseCreator(uint256 _courseId) {
         require(courses[_courseId].creator == msg.sender, "Only course creator can modify this course");
         _;
@@ -85,11 +100,20 @@ contract Mentora {
             "You have not purchased this course");
         _;
     }
+
+    modifier hasNotCompletedCourse(uint256 _courseId) {
+        require(!userPurchases[msg.sender][_courseId].completed, "Course already completed");
+        _;
+    }
     
-    constructor(uint256 _platformFeePercent) {
-        owner = msg.sender;
+    constructor(uint256 _platformFeePercent, address _mentoraToken) Ownable(msg.sender) {
+        require(_platformFeePercent <= 30, "Fee cannot exceed 30%");
         courseCounter = 0;
         platformFeePercent = _platformFeePercent;
+        mentoraToken = MentoraToken(_mentoraToken);
+        
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(INSTRUCTOR_ROLE, msg.sender);
     }
     
     /**
@@ -110,7 +134,7 @@ contract Mentora {
         uint256 _duration,
         uint256 _price,
         uint256 _moduleCount
-    ) external {
+    ) external whenNotPaused nonReentrant {
         require(bytes(_title).length > 0, "Title cannot be empty");
         require(bytes(_thumbnailIpfsHash).length > 0, "Thumbnail IPFS hash cannot be empty");
         require(bytes(_contentIpfsHash).length > 0, "Content IPFS hash cannot be empty");
@@ -141,6 +165,11 @@ contract Mentora {
         newContent.materialCount = 0;
         
         creatorCourseIds[msg.sender].push(courseCounter);
+
+        // Reward creator for content creation
+        if (address(mentoraToken) != address(0)) {
+            mentoraToken.rewardContentCreation(msg.sender);
+        }
         
         emit CourseCreated(courseCounter, _title, msg.sender, _price);
     }
@@ -159,6 +188,8 @@ contract Mentora {
         external 
         courseExists(_courseId)
         onlyCourseCreator(_courseId)
+        whenNotPaused
+        nonReentrant
     {
         require(bytes(_contentIpfsHash).length > 0, "Content IPFS hash cannot be empty");
         
@@ -186,6 +217,8 @@ contract Mentora {
         external
         courseExists(_courseId)
         onlyCourseCreator(_courseId)
+        whenNotPaused
+        nonReentrant
     {
         CourseContent storage content = courseContents[_courseId];
         content.materialCount = _materialCount;
@@ -213,7 +246,9 @@ contract Mentora {
     ) 
         external 
         courseExists(_courseId) 
-        onlyCourseCreator(_courseId) 
+        onlyCourseCreator(_courseId)
+        whenNotPaused
+        nonReentrant
     {
         require(bytes(_title).length > 0, "Title cannot be empty");
         require(bytes(_thumbnailIpfsHash).length > 0, "Thumbnail IPFS hash cannot be empty");
@@ -241,7 +276,9 @@ contract Mentora {
     function delistCourse(uint256 _courseId) 
         external 
         courseExists(_courseId) 
-        onlyCourseCreator(_courseId) 
+        onlyCourseCreator(_courseId)
+        whenNotPaused
+        nonReentrant
     {
         courses[_courseId].isActive = false;
         emit CourseDelisted(_courseId);
@@ -256,6 +293,8 @@ contract Mentora {
         payable 
         courseExists(_courseId)
         courseActive(_courseId)
+        whenNotPaused
+        nonReentrant
     {
         Course storage course = courses[_courseId];
         require(msg.value >= course.price, "Insufficient payment");
@@ -278,7 +317,9 @@ contract Mentora {
             courseId: _courseId,
             purchaseDate: block.timestamp,
             refundRequested: false,
-            refunded: false
+            refunded: false,
+            completed: false,
+            completedDate: 0
         });
         
         userCourseIds[msg.sender].push(_courseId);
@@ -287,19 +328,56 @@ contract Mentora {
         if (msg.value > course.price) {
             payable(msg.sender).transfer(msg.value - course.price);
         }
+
+        // Reward token for course purchase
+        if (address(mentoraToken) != address(0)) {
+            mentoraToken.rewardCoursePurchase(msg.sender);
+        }
         
         emit CoursePurchased(_courseId, msg.sender, course.price);
+    }
+
+    /**
+     * @dev Mark a course as completed by the student
+     * @param _courseId ID of the course to mark as completed
+     */
+    function completeCourse(uint256 _courseId) 
+        external 
+        courseExists(_courseId)
+        hasPurchasedCourse(_courseId)
+        hasNotCompletedCourse(_courseId)
+        whenNotPaused
+        nonReentrant
+    {
+        Purchase storage purchase = userPurchases[msg.sender][_courseId];
+        
+        purchase.completed = true;
+        purchase.completedDate = block.timestamp;
+        
+        // Reward token for course completion
+        if (address(mentoraToken) != address(0)) {
+            mentoraToken.rewardCourseCompletion(msg.sender);
+            emit TokensRewarded(msg.sender, _courseId, mentoraToken.courseCompletionReward());
+        }
+        
+        emit CourseCompleted(_courseId, msg.sender, block.timestamp);
     }
     
     /**
      * @dev Request a refund for a purchased course
      * @param _courseId ID of the course for refund
      */
-    function requestRefund(uint256 _courseId) external courseExists(_courseId) {
+    function requestRefund(uint256 _courseId) 
+        external 
+        courseExists(_courseId)
+        whenNotPaused
+        nonReentrant
+    {
         Purchase storage purchase = userPurchases[msg.sender][_courseId];
         require(purchase.purchaseDate > 0, "Course not purchased");
         require(!purchase.refundRequested, "Refund already requested");
         require(!purchase.refunded, "Already refunded");
+        require(!purchase.completed, "Cannot refund completed course");
         
         // Check if within refund period (30 days)
         require(block.timestamp <= purchase.purchaseDate + 30 days, "Refund period expired");
@@ -315,14 +393,16 @@ contract Mentora {
      * @param _buyer Address of the buyer
      */
     function processRefund(uint256 _courseId, address _buyer) 
-        external 
-        onlyOwner 
-        courseExists(_courseId) 
+        external
+        courseExists(_courseId)
+        whenNotPaused
+        nonReentrant
     {
         Purchase storage purchase = userPurchases[_buyer][_courseId];
         require(purchase.purchaseDate > 0, "Course not purchased");
         require(purchase.refundRequested, "No refund requested");
         require(!purchase.refunded, "Already refunded");
+        require(!purchase.completed, "Cannot refund completed course");
         
         Course storage course = courses[_courseId];
         
@@ -351,7 +431,11 @@ contract Mentora {
     /**
      * @dev Creator withdraws their balance
      */
-    function creatorWithdraw() external {
+    function creatorWithdraw() 
+        external
+        whenNotPaused
+        nonReentrant
+    {
         uint256 amount = creatorBalance[msg.sender];
         require(amount > 0, "No balance to withdraw");
         
@@ -365,7 +449,12 @@ contract Mentora {
     /**
      * @dev Owner withdraws platform fees
      */
-    function ownerWithdraw() external onlyOwner {
+    function ownerWithdraw() 
+        external 
+        onlyOwner
+        whenNotPaused
+        nonReentrant
+    {
         uint256 platformBalance = address(this).balance;
         for (uint256 i = 1; i <= courseCounter; i++) {
             platformBalance -= creatorBalance[courses[i].creator];
@@ -373,16 +462,31 @@ contract Mentora {
         
         require(platformBalance > 0, "No balance to withdraw");
         
-        payable(owner).transfer(platformBalance);
+        payable(owner()).transfer(platformBalance);
     }
     
     /**
      * @dev Change the platform fee percentage
      * @param _newFeePercent New platform fee percentage
      */
-    function changePlatformFee(uint256 _newFeePercent) external onlyOwner {
+    function changePlatformFee(uint256 _newFeePercent) 
+        external 
+        onlyOwner
+    {
         require(_newFeePercent <= 30, "Fee cannot exceed 30%");
         platformFeePercent = _newFeePercent;
+    }
+
+    /**
+     * @dev Set the Mentora token address
+     * @param _mentoraToken Address of the MentoraToken contract
+     */
+    function setMentoraToken(address _mentoraToken) 
+        external 
+        onlyOwner
+    {
+        require(_mentoraToken != address(0), "Invalid token address");
+        mentoraToken = MentoraToken(_mentoraToken);
     }
     
     /**
@@ -494,5 +598,33 @@ contract Mentora {
      */
     function hasUserPurchasedCourse(address _user, uint256 _courseId) external view returns (bool) {
         return userPurchases[_user][_courseId].purchaseDate > 0 && !userPurchases[_user][_courseId].refunded;
+    }
+
+    /**
+     * @dev Check if user has completed a course
+     * @param _user User address
+     * @param _courseId Course ID
+     * @return Boolean indicating completion status
+     */
+    function hasUserCompletedCourse(address _user, uint256 _courseId) external view returns (bool) {
+        return userPurchases[_user][_courseId].completed;
+    }
+
+    /**
+     * @dev Get completion date of a course
+     * @param _user User address
+     * @param _courseId Course ID
+     * @return Timestamp of completion or 0 if not completed
+     */
+    function getUserCourseCompletionDate(address _user, uint256 _courseId) external view returns (uint256) {
+        return userPurchases[_user][_courseId].completedDate;
+    }
+
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
     }
 }
