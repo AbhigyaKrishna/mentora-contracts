@@ -125,11 +125,11 @@ contract CourseManager is Ownable, Pausable, AccessControl, ReentrancyGuard {
      * @param _price Course price in wei
      */
     function createCourse(
-        string memory _title,
-        string memory _description,
-        string memory _category,
-        string memory _thumbnailIpfsHash,
-        string memory _contentIpfsHash,
+        string calldata _title,
+        string calldata _description,
+        string calldata _category,
+        string calldata _thumbnailIpfsHash,
+        string calldata _contentIpfsHash,
         uint256 _difficulty,
         uint256 _duration,
         uint256 _price,
@@ -182,7 +182,7 @@ contract CourseManager is Ownable, Pausable, AccessControl, ReentrancyGuard {
      */
     function updateCourseContent(
         uint256 _courseId,
-        string memory _contentIpfsHash,
+        string calldata _contentIpfsHash,
         uint256 _moduleCount
     ) 
         external 
@@ -236,10 +236,10 @@ contract CourseManager is Ownable, Pausable, AccessControl, ReentrancyGuard {
      */
     function updateCourse(
         uint256 _courseId, 
-        string memory _title, 
-        string memory _description,
-        string memory _thumbnailIpfsHash,
-        string memory _contentIpfsHash,
+        string calldata _title, 
+        string calldata _description,
+        string calldata _thumbnailIpfsHash,
+        string calldata _contentIpfsHash,
         uint256 _price, 
         bool _isActive,
         uint256 _moduleCount

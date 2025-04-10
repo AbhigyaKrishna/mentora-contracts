@@ -109,11 +109,11 @@ contract AssignmentManager is Ownable, Pausable, AccessControl, ReentrancyGuard 
 
     // Functions
     function createAssignment(
-        string memory _title,
-        string memory _description,
-        string memory _question,
-        string[] memory _evaluationCriteria,
-        string memory _metaPromptIpfsHash
+        string calldata _title,
+        string calldata _description,
+        string calldata _question,
+        string[] calldata _evaluationCriteria,
+        string calldata _metaPromptIpfsHash
     ) public onlyRole(TEACHER_ROLE) whenNotPaused nonReentrant returns (uint256) {
         uint256 assignmentId = assignmentCounter++;
         
@@ -134,11 +134,11 @@ contract AssignmentManager is Ownable, Pausable, AccessControl, ReentrancyGuard 
 
     function updateAssignment(
         uint256 _assignmentId,
-        string memory _title,
-        string memory _description,
-        string memory _question,
-        string[] memory _evaluationCriteria,
-        string memory _metaPromptIpfsHash
+        string calldata _title,
+        string calldata _description,
+        string calldata _question,
+        string[] calldata _evaluationCriteria,
+        string calldata _metaPromptIpfsHash
     ) public assignmentExists(_assignmentId) onlyCreator(_assignmentId) whenNotPaused nonReentrant {
         Assignment storage assignment = assignments[_assignmentId];
         require(assignment.isActive, "Assignment is not active");
@@ -165,7 +165,7 @@ contract AssignmentManager is Ownable, Pausable, AccessControl, ReentrancyGuard 
 
     function submitAssignment(
         uint256 _assignmentId,
-        string memory _solutionIpfsHash
+        string calldata _solutionIpfsHash
     )
         public
         assignmentExists(_assignmentId)
@@ -198,7 +198,7 @@ contract AssignmentManager is Ownable, Pausable, AccessControl, ReentrancyGuard 
         uint256 _assignmentId,
         address _student,
         uint256 _grade,
-        string memory _feedback
+        string calldata _feedback
     )
         public
         assignmentExists(_assignmentId)
@@ -270,7 +270,7 @@ contract AssignmentManager is Ownable, Pausable, AccessControl, ReentrancyGuard 
             bool isActive
         ) 
     {
-        Assignment memory assignment = assignments[_assignmentId];
+        Assignment storage assignment = assignments[_assignmentId];
         return (
             assignment.title,
             assignment.description,
@@ -297,7 +297,7 @@ contract AssignmentManager is Ownable, Pausable, AccessControl, ReentrancyGuard 
             bool isRewarded
         )
     {
-        Submission memory submission = submissions[_assignmentId][_student];
+        Submission storage submission = submissions[_assignmentId][_student];
         return (
             submission.solutionIpfsHash,
             submission.submittedAt,
