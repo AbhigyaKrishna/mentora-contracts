@@ -38,7 +38,7 @@ contract AssignmentManager is Ownable, Pausable, AccessControl, ReentrancyGuard 
     uint256 public passingGradeThreshold = 70;
 
     // MentoraToken instance
-    MentoraToken public mentoraToken;
+    MentoraToken private mentoraToken;
 
     // Mapping to store assignments by their ID
     mapping(uint256 => Assignment) public assignments;

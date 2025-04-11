@@ -55,7 +55,7 @@ contract CourseManager is Ownable, Pausable, AccessControl, ReentrancyGuard {
 
     
     // MentoraToken instance
-    MentoraToken public mentoraToken;
+    MentoraToken private mentoraToken;
     
     // Mapping to store courses by their ID
     mapping(uint256 => Course) public courses;
@@ -167,9 +167,9 @@ contract CourseManager is Ownable, Pausable, AccessControl, ReentrancyGuard {
         creatorCourseIds[msg.sender].push(courseCounter);
 
         // Reward creator for content creation
-        if (address(mentoraToken) != address(0)) {
-            mentoraToken.rewardContentCreation(msg.sender);
-        }
+        // if (address(mentoraToken) != address(0)) {
+        //     mentoraToken.rewardContentCreation(msg.sender);
+        // }
         
         emit CourseCreated(courseCounter, _title, msg.sender, _price);
     }
